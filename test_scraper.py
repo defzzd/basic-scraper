@@ -64,8 +64,8 @@ class test_Scraper(unittest.TestCase):
         # This particular block was copy-pasted and edited to match my code...
         # https://github.com/jbbrokaw/basic-scraper/blob/master/test_scraper.py
         # ... after I understood what it did.
-        parsed_html = scraper.extract_listings(self.parsed_html)
-        testing_dictionary = parsed_html[0]
+        parsed_html = scraper.extract_listings(self.parsed_html).next()
+        testing_dictionary = parsed_html
         assert isinstance(testing_dictionary, dict)
         assert isinstance(testing_dictionary['size'], unicode)
         assert "br" in testing_dictionary['size']
@@ -77,18 +77,29 @@ class test_Scraper(unittest.TestCase):
         assert testing_dictionary['price'].strip("$").isdigit()
 
 
+    def test_add_address(self):
+
+        # This test function inspired by and partially paraphrased from:
+        # https://github.com/jbbrokaw/basic-scraper/blob/master/test_scraper.py
+
+        # Also tests extract_listings(), parse_source()
+        # and return_data_from_file().
+
+        with self.assertRaises(TypeError):
+            scraper.add_address()
+        with self.assertRaises(TypeError):
+            scraper.add_address(None)
+
+        content = scraper.return_data_from_file('search_results.html')
+        encoding = 'utf-8'
+        parsed_html = scraper.parse_source(content, encoding)
+        apartment_listing = scraper.extract_listings(parsed_html).next()
+
+        assert 'data-latitude' in apartment_listing['location']
+        assert 'data-longitude' in apartment_listing['location']
+
+
+
+
+
 unittest.main()
-
-
-'''
-
-    class pj
-    --12--
-    --13--
-    --15--
-    --16--
-    --17--
-    --18--
-          19
-
-'''
