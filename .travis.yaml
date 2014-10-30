@@ -1,0 +1,8 @@
+language: python
+# Can use multiple python versions... but don't...
+python:
+  - "2.7"
+# Tell pip to install dependencies (required for Travis)
+install: "pip install -r requirements.txt"
+# Run tests; also supports py.test
+script: test_scraper.py
