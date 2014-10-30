@@ -24,6 +24,7 @@ HTML from a query to craigslist. This function should:
 
 import requests
 from bs4 import BeautifulSoup
+import json  # Used for Google's Geocode API
 import pprint  # "Pretty Printing," I think. From tutorial suggestions at:
 # http://codefellows.github.io/python-dev-accelerator/
 #    assignments/day11/scraper.html
@@ -71,23 +72,12 @@ def return_apartment_search_results(query=None,
 
 def parse_source(content, encoding='utf-8'):
 
-
     beautiful_parse = BeautifulSoup(content, from_encoding=encoding)
 
     return beautiful_parse
 
 
-
-
-
-
-
-
-
-
-
-
-def return_from_search_results_file(file_name):
+def return_data_from_file(file_name):
 
     with open(file_name, 'r') as the_file:
         return the_file.read()
@@ -120,24 +110,69 @@ def extract_listings(parsed_html):
             'price': price_span.string.strip(),
             'size': price_span.next_sibling.strip(' \n-/')
         }
-        extracted.append(compiled_listing)
-    return extracted
+        # The tutorial says generators have a lower memory footprint.
+        # I'd never thought about it before, but suddenly this makes me
+        # want to generatorize all the lists...!
+        yield compiled_listing
 
+
+def get_addresses(apartment_listing):
+
+    # The universal resource locator where Google's
+    # Geocode application programming interface lives.
+    url_for_the_api = 'http://maps.googleapis.com/maps/api/geocode/json'
+    # Hardcoded to Code Fellows, since craigslist changed how they work.
+    loc = apartment_listing['location']
+    # Next is a format string, used by the string formatting call below it.
+    latlng_tmpl = "{data-latitude},{data-longitude}"
+    parameters = {
+        'sensor': 'false',
+        'latlng': latlng_tmpl.format(**loc),
+    }
+    # Actually pinging Google. This line sends a real-world HTTP request!
+    response = requests.get(url_for_the_api, params=parameters)
+    return response
+
+def add_address(apartment_listing, testing=False):
+    if testing == True:
+        apartment_listing = return_data_from_file("geocode_cache.html")
+    else:
+        response = get_addresses(apartment_listing)
+        # Check the HTTP error code for a problem and raise an exception if so:
+        response.raise_for_status()
+        data_from_google = json.loads(response.text)
+        if data_from_google['status'] == 'OK':
+            # This selects the first address Google returns for a given latlng:
+            first_result = data_from_google['results'][0]
+            apartment_listing['address'] = first_result['formatted_address']
+        else:
+            apartment_listing['address'] = 'unavailable'
+    return apartment_listing
 
 
 if __name__ == "__main__":
 
     # Testing with html saved in a file on my drive:
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
-        content = return_from_search_results_file("search_results.html")
+        content = return_data_from_file("search_results.html")
         encoding = 'utf-8'  # Works
+        testing = True
+        parsed_html = parse_source(content, encoding)
+        for each_apartment_listing in extract_listings(parsed_html):
+            # Adding Geocode data... for CodeFellows:
+            listing_with_address = add_address(each_apartment_listing, testing=testing)
+            pprint.pprint(listing_with_address)
+            break
+
     else:
         content, encoding = return_apartment_search_results(query="Queen Anne",
                                     minAsk=600,
                                     maxAsk=1500,
                                     bedrooms=1)
+        testing = False
 
-    parsed_html = parse_source(content, encoding)
-    apartment_listings = extract_listings(parsed_html)
-    print(len(apartment_listings))
-    pprint.pprint(apartment_listings[0])  # Suggested by tutorial; see imports
+        parsed_html = parse_source(content, encoding)
+        for each_apartment_listing in extract_listings(parsed_html):
+            # Adding Geocode data... for CodeFellows:
+            listing_with_address = add_address(each_apartment_listing, testing=testing)
+            pprint.pprint(listing_with_address)
